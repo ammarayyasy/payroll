@@ -34,6 +34,8 @@ class ScheduleForm
                             ->label('WFA')
                             ->onIcon(Heroicon::Home)
                             ->offIcon(Heroicon::BuildingOffice2),
+                        Toggle::make('is_banned')
+                            ->label("Banned"),
                     ])
                 ]),
             ]);
