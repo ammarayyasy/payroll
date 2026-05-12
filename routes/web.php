@@ -11,4 +11,4 @@ Route::get('/login', function () {
     return redirect('/dashboard/login');
 })->name('login');
 
-Route::get('/presensi', Presensi::class)->name('presensi')->middleware('auth');
+Route::get('/presensi', Presensi::class)->name('presensi')->middleware(["auth", "isLeave"]);
