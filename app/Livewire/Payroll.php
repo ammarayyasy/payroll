@@ -3,6 +3,8 @@
 namespace App\Livewire;
 
 use App\Models\Attendance;
+use App\Models\Leave;
+use App\Models\Schedule;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
@@ -14,7 +16,12 @@ class Payroll extends Component
     public $end_date;
 
     public $pegawai;
-    public $total_duration = '00:00:00';
+    public $total_duration;
+    public $total_hour = 0;
+    public $total_salary = 0;
+    public $leave_pay = 0;
+
+    public $rate_per_hour = 35000;
 
     public function render()
     {
@@ -36,15 +43,55 @@ class Payroll extends Component
         $start = Carbon::parse($this->start_date)->startOfDay();
         $end = Carbon::parse($this->end_date)->endOfDay();
 
-        // Total Detik
+        /*  
+        ==============================================
+        TOTAL DETIK ATTENDANCES
+        ==============================================
+        */
         $attendances = Attendance::where('user_id', $this->user_id)
                     ->whereBetween('created_at', [$start, $end])
                     ->whereNotNull('duration')
                     ->get();
 
-        $totalSeconds = $attendances->sum(function ($attendance) {
+        $attendanceSeconds = $attendances->sum(function ($attendance) {
             return strtotime($attendance->duration) - strtotime('00:00:00');
         });
+
+        /* 
+        ==============================================
+        TOTAL DETIK CUTI
+        =============================================
+        */
+        $schedule = Schedule::where('user_id', $this->user_id)->first();
+
+        $scheduleStart = Carbon::parse($schedule->shift->start_time);
+        $scheduleEnd = Carbon::parse($schedule->shift->end_time);
+
+        $scheduleSeconds = $scheduleStart->diffInSeconds($scheduleEnd);
+
+        $leaves = Leave::where('user_id', $this->user_id)
+            ->whereBetween('created_at', [$start, $end])
+            ->whereIn('status', ['pending', 'approved'])
+            ->get();
+
+        $totalLeaveDays = $leaves->count();
+
+        // hitung total detik cuti
+        $leaveSeconds = $totalLeaveDays * $scheduleSeconds;
+        
+        // ubah detik cuti ke jam
+        $leaveHour = $leaveSeconds / 3600;
+
+        // total tambahan cuti
+        $this->leave_pay = $leaveHour * $this->rate_per_hour;
+
+
+        /* 
+        ============================================================
+        HITUNG GAJI
+        ============================================================
+        */
+        $totalSeconds = $attendanceSeconds + $leaveSeconds;
 
         // convert ke jam, menit, detik
         $hours = floor($totalSeconds / 3600);
@@ -52,6 +99,12 @@ class Payroll extends Component
         $second = $totalSeconds % 60;
 
         $this->total_duration = sprintf("%02d:%02d:%02d", $hours, $minutes, $second);
+
+        // hitung dalam bentuk desimal
+        $this->total_hour = $totalSeconds / 3600;
+
+        // hitung total gaji
+        $this->total_salary = $this->total_hour * $this->rate_per_hour;
     }
 
     public function getFormattedDurationProperty()
